@@ -1,1 +1,9 @@
 @import 'react-quill-new/dist/quill.snow.css';
+
+.ql-tooltip.ql-editing {
+    position: fixed !important;
+    left: 50%  !important;
+    top: 50%  !important;
+    transform: translate(-50%,-50%) !important;
+    z-index: 1000;
+}

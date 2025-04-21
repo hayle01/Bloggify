@@ -2,9 +2,10 @@ import React, { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FiInfo, FiSave, FiTag, FiX } from "react-icons/fi";
 import { QuilEditor } from "../components/QuilEditor";
-import {useAuth} from '../Context/AuthContext';
+import { useAuth } from "../Context/AuthContext";
 import { useNavigate } from "react-router";
 import { updloadImage } from "../lib/storage";
+import { CreateArticle } from "../lib/articles";
 
 // Available tags - In a real app, fetch from Supabase
 const AVAILABLE_TAGS = [
@@ -63,44 +64,45 @@ export const EditorPage = () => {
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
 
-    if(file) {
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file");
 
-
-      if(!file.type.startsWith('image/')) {
-        toast.error('Please select an image file')
-
-        e.target.value = '';
-        setSelectedImage(null)
-        return
+        e.target.value = "";
+        setSelectedImage(null);
+        return;
       }
-
 
       const maxSize = 2 * 1024 * 1024;
 
-      if (file.size > maxSize){
-         toast.error(`Image size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds the 2MB limit`)
+      if (file.size > maxSize) {
+        toast.error(
+          `Image size (${(file.size / 1024 / 1024).toFixed(
+            2
+          )}MB) exceeds the 2MB limit`
+        );
 
-         e.target.value = '';
-         setSelectedImage(null);
-         return
+        e.target.value = "";
+        setSelectedImage(null);
+        return;
       }
 
       setSelectedImage(file);
 
       // toast.success(`Selected file : ${file.name}`);
     }
-  }
+  };
 
   const handleUploadImage = async () => {
-    if(!selectedImage){
-      toast.error('Please select an image')
-      return
+    if (!selectedImage) {
+      toast.error("Please select an image");
+      return;
     }
 
     // check if the user logged in
-    if(!user) {
-     toast.error("You must be signed in to upload images");
-     navigate("/signIn");
+    if (!user) {
+      toast.error("You must be signed in to upload images");
+      navigate("/signIn");
       return;
     }
 
@@ -108,42 +110,158 @@ export const EditorPage = () => {
 
     setIsUploading(true);
 
-    console.log('Starting image upload for', selectedImage);
+    console.log("Starting image upload for", selectedImage);
 
     try {
       // upload image to supabase
-      const { path, url} = await updloadImage(selectedImage, user.id);
-      console.log('Image uploaded successfully', url, path )
+      const { path, url } = await updloadImage(selectedImage, user.id);
+      console.log("Image uploaded successfully", url, path);
 
       setfeaturedImageUrl(url.publicUrl);
-      console.log('Featured image URL', featuredImageUrl)
+      console.log("Featured image URL", featuredImageUrl);
       setImagePath(path);
 
       setSelectedImage(null);
       // clear selected image and file input
-      if(fileInputRef.current){
-        fileInputRef.current.value = '';
-        
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
-      
-      toast.success('Image uploaded successfully')
-      console.log('Image state after upload:', {
+
+      toast.success("Image uploaded successfully");
+      console.log("Image state after upload:", {
         featuredImageUrl: url,
-        imagePath: path
-      })
+        imagePath: path,
+      });
       setIsUploading(false);
       // return the uploaded image data
-      return {url, path}
-
+      return { url, path };
     } catch (error) {
-      console.log('Error uploading image', error);
-      toast.error(`Failed to upload image: ${error.message || 'Unkhown error'}`)
-      throw error
+      console.log("Error uploading image", error);
+      toast.error(
+        `Failed to upload image: ${error.message || "Unkhown error"}`
+      );
+      throw error;
+    }
+  };
+
+  // handle save
+  const handleSave = async (publishStatus = null) => {
+    if (!title.trim()) {
+      toast.error("Please add a title to your article");
+      return;
     }
 
-  }
+    // check for content
+    if (!content || content == "<p><br></p>") {
+      toast.error("Please add some content to your article");
+      return;
+    }
+
+    // If user is not logged in, redirect to sign in
+    if (!user) {
+      toast.error("You must be signed in to save an article");
+      navigate("/signin");
+      return;
+    }
+
+    let uploadedImageData = null;
+
+    // Check if there's a selected image that hasn't been uploaded yet
+
+    if (selectedImage) {
+      console.log("Selected image needs to be uploaded first:", selectedImage);
+      const shouldUpload = confirm(
+        "You have a selected image that hasn't been uploaded yet. Would you like to upload it now?"
+      );
+
+      if (shouldUpload) {
+        try {
+          uploadedImageData = await handleUploadImage();
+          console.log("Image uploaded during save:", uploadedImageData);
+
+          // Wait a moment for state to update
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        } catch (error) {
+          console.error("Failed to upload image during save:", error);
+          toast.error(
+            "Failed to upload image. Please try uploading the image first."
+          );
+          return;
+        }
+      } else {
+        // If user doesn't want to upload the image, ask if they want to proceed without it
+        const shouldProceed = confirm(
+          "Do you want to proceed without uploading the image?"
+        );
+        if (!shouldProceed) {
+          return;
+        }
+        // Clear the selected image since user chose not to upload
+        setSelectedImage(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    }
+
+    setIsSaving(true);
+
+    console.log("Starting article save with state:", {
+      isEditMode,
+      featuredImageUrl,
+      imagePath,
+      selectedImage,
+      uploadedImageData,
+    });
+
+    try {
+
+      // Determine if we should update the publish status
+      const published = publishStatus !== null ? publishStatus : isPublished;
+      // Get the current image state, preferring newly uploaded image if available
+      const currentImageUrl = uploadedImageData?.url || featuredImageUrl;
+      const currentImagePath = uploadedImageData?.path || imagePath;
+
+      console.log("Current image state:", {
+        featuredImageUrl: currentImageUrl,
+        imagePath: currentImagePath,
+        selectedImage,
+        uploadedImageData,
+      });
+
+      const articleData = {
+        title,
+        content,
+        tags: selectedTags,
+        authorId: user.id,
+        published,
+        featuredImageUrl: currentImageUrl,
+      };
+
+      console.log('Saving article with data:', articleData);
+
+      let savedArticle;
+
+      if(isEditMode){
+        // update article || create article
+        
+      }else{
+        // insert article
+        savedArticle = await CreateArticle(articleData);
+
+        console.log('Article saved successfully:', savedArticle)
+
+        toast.success(`Article ${isEditMode ? 'updated' : 'created'} successfully!`)
+      }
+    } catch (error) {
+      console.error('Error saving article:', error)
+      toast.error('Failed to save your article. Please try again later.')
+    } finally {
+      setIsSaving(false)
+    }
 
 
+};
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -160,12 +278,18 @@ export const EditorPage = () => {
             Cancel
           </button>
 
-          <button className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+          <button
+            onClick={() => handleSave(false)}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
             <FiSave className="inline mr-2" />
             {isEditMode ? "Update Draft" : " Save as Draft"}
           </button>
 
-          <button className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+          <button
+            onClick={() => handleSave(true)}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
             <FiSave className="inline mr-2" />
             {isEditMode ? "Update and publish" : "Save and Publish"}
           </button>
@@ -356,14 +480,14 @@ export const EditorPage = () => {
 
       <div className="py-4  flex justify-end space-x-4">
         <button
-          // onClick={() => handleSave(false)}
+          onClick={() => handleSave(false)}
           className="px-6 py-3 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isEditMode ? "Update as Draft" : "Save as Draft"}
         </button>
 
         <button
-          // onClick={() => handleSave(true)}
+          onClick={() => handleSave(true)}
           className="px-6 py-3 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isEditMode ? "Update and Publish" : "Save and Publish"}

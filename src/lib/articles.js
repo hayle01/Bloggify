@@ -1,12 +1,12 @@
 import supabase from "./supabase";
 
-const CreateArticle = async (article) => {
+export const CreateArticle = async (article) => {
   const articleData = {
     title: article.title,
     content: article.content,
-    featured_image: article.featuredImageURL,
+    featured_image: article.featuredImageUrl,
     published: article.published || false,
-    author_id: article.authorID,
+    author_id: article.authorId,
     tags: article.tags,
   };
 
