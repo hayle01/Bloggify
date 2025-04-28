@@ -49,7 +49,7 @@ export const Header = () => {
               {isLoggedIn && (
                 <>
                   <NavLink
-                    to="write"
+                    to="editor"
                     className={({ isActive }) =>
                       isActive
                         ? "inline-flex items-center px-1 pt-1 text-sm  text-gray-900 border-b-2 border-orange-500"
@@ -60,7 +60,7 @@ export const Header = () => {
                   </NavLink>
 
                   <NavLink
-                    to="myarticles"
+                    to="manage-articles"
                     className={({ isActive }) =>
                       isActive
                         ? "inline-flex items-center px-1 pt-1 text-sm  text-gray-900 border-b-2 border-orange-500"
