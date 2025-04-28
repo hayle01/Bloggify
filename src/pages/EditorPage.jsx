@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { FiInfo, FiSave, FiTag, FiX } from "react-icons/fi";
 import { QuilEditor } from "../components/QuilEditor";
 import { useAuth } from "../Context/AuthContext";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { updloadImage } from "../lib/storage";
 import { CreateArticle } from "../lib/articles";
 
@@ -27,7 +27,8 @@ const AVAILABLE_TAGS = [
 ];
 
 export const EditorPage = () => {
-  let isEditMode = false;
+  const{ id } = useParams();
+  let isEditMode = Boolean(id);
 
   // states for article data
   const [title, setTitle] = useState("");
