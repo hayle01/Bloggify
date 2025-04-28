@@ -8,7 +8,7 @@ import supabase from '../lib/supabase';
 export const Profile = () => {
 
    const [loading, setLoading] = useState(false);
-   const [username, setUsername] = useState(null);
+   const [username, setUsername] = useState('');
    const [avatar, setAvatar] = useState(null);
    const [avatarUrl, setAvatarUrl] = useState(null);
 

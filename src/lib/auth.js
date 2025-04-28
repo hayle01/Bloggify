@@ -134,7 +134,6 @@ export const onAuthChange = (callback) => {
   })
 
   return () => data.subscription.unsubscribe();
-  
 }
 
 
