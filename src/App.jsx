@@ -21,7 +21,7 @@ function App() {
     <AuthContextProvider>
       <div>
         <Header />
-        <main className="max-w-7xl mx-auto">
+        <main>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="articles" element={<Articles />} />
