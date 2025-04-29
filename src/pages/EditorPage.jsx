@@ -1,11 +1,11 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FiInfo, FiSave, FiTag, FiX } from "react-icons/fi";
 import { QuilEditor } from "../components/QuilEditor";
 import { useAuth } from "../Context/AuthContext";
 import { useNavigate, useParams } from "react-router";
 import { updloadImage } from "../lib/storage";
-import { CreateArticle } from "../lib/articles";
+import { CreateArticle, getArticleById, updateArticle } from "../lib/articles";
 
 // Available tags - In a real app, fetch from Supabase
 const AVAILABLE_TAGS = [
@@ -27,7 +27,7 @@ const AVAILABLE_TAGS = [
 ];
 
 export const EditorPage = () => {
-  const{ id } = useParams();
+  const { id } = useParams();
   let isEditMode = Boolean(id);
 
   // states for article data
@@ -49,6 +49,47 @@ export const EditorPage = () => {
   const editorRef = useRef(null);
 
   const { user } = useAuth();
+
+  // edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      const fetchArticle = async () => {
+        try {
+          const article = await getArticleById(id);
+          if (!article) {
+            setError("Article not found.");
+            return;
+          }
+
+          if (article.author_id !== user.id) {
+            setError("You don't a permission to edit this article");
+            return;
+          }
+
+          setTitle(article.title);
+          setContent(article.content);
+          setSelectedTags(article.tags);
+
+          if (article.featured_image) {
+            console.log(
+              "Loading existing featured image:",
+              article.featured_image
+            );
+            // Simply set the URL directly without the fetch check
+            setfeaturedImageUrl(article.featured_image);
+          } else {
+            setfeaturedImageUrl("");
+          }
+
+          setIspublished(article.published || false);
+        } catch (error) {
+          console.error("Error fetching article:", err);
+          setError("Failed to load article");
+        }
+      };
+      fetchArticle();
+    }
+  }, [id, isEditMode, user.id]);
 
   const navigate = useNavigate();
 
@@ -216,7 +257,6 @@ export const EditorPage = () => {
     });
 
     try {
-
       // Determine if we should update the publish status
       const published = publishStatus !== null ? publishStatus : isPublished;
       // Get the current image state, preferring newly uploaded image if available
@@ -239,30 +279,30 @@ export const EditorPage = () => {
         featuredImageUrl: currentImageUrl,
       };
 
-      console.log('Saving article with data:', articleData);
+      console.log("Saving article with data:", articleData);
 
       let savedArticle;
 
-      if(isEditMode){
-        // update article || create article
-        
-      }else{
+      if (isEditMode) {
+        // update article
+        savedArticle = await updateArticle(id, articleData);
+      } else {
         // insert article
         savedArticle = await CreateArticle(articleData);
 
-        console.log('Article saved successfully:', savedArticle)
+        console.log("Article saved successfully:", savedArticle);
 
-        toast.success(`Article ${isEditMode ? 'updated' : 'created'} successfully!`)
+        toast.success(
+          `Article ${isEditMode ? "updated" : "created"} successfully!`
+        );
       }
     } catch (error) {
-      console.error('Error saving article:', error)
-      toast.error('Failed to save your article. Please try again later.')
+      console.error("Error saving article:", error);
+      toast.error("Failed to save your article. Please try again later.");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-
-
-};
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -281,18 +321,16 @@ export const EditorPage = () => {
 
           <button
             onClick={() => handleSave(false)}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
             <FiSave className="inline mr-2" />
             {isEditMode ? "Update Draft" : " Save as Draft"}
           </button>
 
           <button
             onClick={() => handleSave(true)}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
             <FiSave className="inline mr-2" />
-            {isEditMode ? "Update and publish" : "Save and Publish"}
+            {isEditMode ? "Update and Publish" : "Save and Publish"}
           </button>
         </div>
       </div>
@@ -301,8 +339,7 @@ export const EditorPage = () => {
       <div className="my-6">
         <label
           htmlFor="title"
-          className="block text-sm font-medium text-gray-700"
-        >
+          className="block text-sm font-medium text-gray-700">
           Title
         </label>
         <input
@@ -323,8 +360,7 @@ export const EditorPage = () => {
           <button
             type="button"
             onClick={() => toast("Maximum image size allowed is 5MB")}
-            className="ml-2 text-xs text-gray-500 hover:text-gray-700"
-          >
+            className="ml-2 text-xs text-gray-500 hover:text-gray-700">
             <FiInfo className="inline-block" />
           </button>
         </label>
@@ -355,8 +391,7 @@ export const EditorPage = () => {
                     }
                   }}
                   disabled={isUploading}
-                  className="px-3 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
-                >
+                  className="px-3 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 disabled:opacity-50 cursor-pointer">
                   {isUploading ? "Uploading..." : "Upload"}
                 </button>
               )}
@@ -380,8 +415,7 @@ export const EditorPage = () => {
 
               <button
                 type="button"
-                className="text-red-500 text-xs hover:text-red-700"
-              >
+                className="text-red-500 text-xs hover:text-red-700">
                 Remove
               </button>
             </div>
@@ -393,8 +427,7 @@ export const EditorPage = () => {
       <div className="mb-6 relative">
         <label
           htmlFor="tags"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
+          className="block text-sm font-medium text-gray-700 mb-1">
           Tags
         </label>
 
@@ -403,20 +436,17 @@ export const EditorPage = () => {
             <span
               key={tag}
               onClick={() => toggleTag(tag)}
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 cursor-pointer"
-            >
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 cursor-pointer">
               {tag}
               <button
                 type="button"
-                className="ml-1.5 inline-flex text-orange-400 hover:text-orange-600 focus:outline-none"
-              >
+                className="ml-1.5 inline-flex text-orange-400 hover:text-orange-600 focus:outline-none">
                 <span className="sr-only">Remove tag {tag}</span>
                 <svg
                   className="h-2 w-2"
                   stroke="currentColor"
                   fill="none"
-                  viewBox="0 0 8 8"
-                >
+                  viewBox="0 0 8 8">
                   <path
                     strokeLinecap="round"
                     strokeWidth="1.5"
@@ -433,8 +463,7 @@ export const EditorPage = () => {
         <button
           type="button"
           onClick={() => setIstagMenuOpen(!isTagMenuOpen)}
-          className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 cursor-pointer"
-        >
+          className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 cursor-pointer">
           <FiTag className="mr-1.5 h-4 w-4" />
           Add Tags
         </button>
@@ -443,8 +472,7 @@ export const EditorPage = () => {
           <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-gray-400 ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
             <div
               className="grid grid-cols-2 gap-2 p-2"
-              onMouseLeave={() => setIstagMenuOpen(false)}
-            >
+              onMouseLeave={() => setIstagMenuOpen(false)}>
               {AVAILABLE_TAGS.map((tag) => (
                 <div
                   key={tag}
@@ -453,8 +481,7 @@ export const EditorPage = () => {
                       ? "bg-orange-50 text-orange-700"
                       : ""
                   }`}
-                  onClick={() => toggleTag(tag)}
-                >
+                  onClick={() => toggleTag(tag)}>
                   {tag}
                 </div>
               ))}
@@ -482,15 +509,13 @@ export const EditorPage = () => {
       <div className="py-4  flex justify-end space-x-4">
         <button
           onClick={() => handleSave(false)}
-          className="px-6 py-3 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
+          className="px-6 py-3 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
           {isEditMode ? "Update as Draft" : "Save as Draft"}
         </button>
 
         <button
           onClick={() => handleSave(true)}
-          className="px-6 py-3 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
+          className="px-6 py-3 border border-transparent rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
           {isEditMode ? "Update and Publish" : "Save and Publish"}
         </button>
       </div>
