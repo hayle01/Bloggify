@@ -80,5 +80,45 @@ export const deleteArticle = async (id) => {
     console.log('Successfully deleted Article with id:', id);
   }
 
-  return data, error
+  return data
+}
+
+
+export const getArticleById = async (id) =>{
+  const { data, error } = await supabase
+                        .from('articles')
+                        .select(`*, comments(id,content, created_at,
+                              user:user_id(id, username,avator_url)) `)
+                        .eq('id', id)
+                        .single();
+  if(error) throw error
+  return data
+
+}
+
+export const updateArticle = async (id, updates) => {
+  console.log(`Attempting to update article with ID: ${id}`, updates);
+
+  const { data, error } = await supabase
+  .from('articles')
+  .update({
+    title: updates.title,
+    content: updates.content,
+    tags: updates.tags,
+    featured_image: updates.featuredImageUrl,
+    published : updates.published,
+    updated_at: new Date()
+  })
+  .eq('id', id)
+  .select()
+  .single()
+
+  if(error){
+    console.error('Error updating article:', error)
+        console.error('Update error details:', JSON.stringify(error, null, 2))
+        throw error
+  }
+  console.log('Article updated successfully:', data)
+  toast.success('Article updated successfully');
+  return data
 }
